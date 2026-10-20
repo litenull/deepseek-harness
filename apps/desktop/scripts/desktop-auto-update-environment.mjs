@@ -36,6 +36,12 @@ const UPDATE_ENVIRONMENTS = {
 const UPDATE_TARGETS = new Set(['mac-arm64', 'mac-x64', 'win-x64'])
 
 /**
+ * Release targets that emit a local packaging record. The Linux target has no update feed,
+ * so it produces a record for local packaging only and is never uploaded.
+ */
+const RECORD_TARGETS = new Set([...UPDATE_TARGETS, 'linux-x64'])
+
+/**
  * Resolve the update deployment, defaulting local release work to test.
  * @param {NodeJS.ProcessEnv} env - Packaging or upload environment.
  * @returns {'test' | 'production'} Validated deployment name.
@@ -65,11 +71,11 @@ export function resolveDesktopAutoUpdateTarget(platform, arch) {
 
 /**
  * Return the local completion record filename for one packaged target.
- * @param {'mac-arm64' | 'mac-x64' | 'win-x64'} target - Supported release target.
+ * @param {'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64'} target - Supported packaging target.
  * @returns {string} Filename stored beside electron-builder artifacts.
  */
 export function desktopBuildRecordFilename(target) {
-  if (!UPDATE_TARGETS.has(target)) {
+  if (!RECORD_TARGETS.has(target)) {
     throw new Error(`desktop auto-update: unsupported target ${target}`)
   }
   return `${target}-release.json`

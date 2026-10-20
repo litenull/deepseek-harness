@@ -26,8 +26,11 @@ async function checkPty() {
   const pty = requireRuntime('node-pty')
   const script = join(scratch, 'pty.cjs')
   writeFileSync(script, "process.stdout.write('runtime-payload-pty-ok\\n')\n", { flag: 'wx', mode: 0o600 })
+  // The narrow environment models a stripped child; keep the loader search
+  // path, because the dynamic loader resolves this Electron's libraries
+  // through it on systems without default library directories (NixOS).
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => (
-    /^(?:path|systemroot|windir|comspec|ELECTRON_RUN_AS_NODE)$/iu.test(name)
+    /^(?:path|systemroot|windir|comspec|ld_library_path|ELECTRON_RUN_AS_NODE)$/iu.test(name)
   )))
   Object.assign(env, { HOME: scratch, USERPROFILE: scratch, TMP: scratch, TEMP: scratch, TMPDIR: scratch })
   env.DSH_DESKTOP_NODE_EXECUTABLE = process.execPath

@@ -55,6 +55,7 @@ const harness = await vi.hoisted(async () => {
   // The native Platform view owns persistent browser storage; Desktop startup tests replace it so
   // each quit can control when that cleanup settles.
   const platformDispose = vi.fn(() => platformDisposeDeferred?.promise ?? Promise.resolve())
+  let platformViewPlatform: 'darwin' | 'win32' | null | undefined
   let platformCloseDeferred: ReturnType<typeof deferred> | undefined
   const platformCloseAndWait = vi.fn(() => platformCloseDeferred?.promise ?? Promise.resolve())
   const readLoginShell = async (base: NodeJS.ProcessEnv) => ({
@@ -196,6 +197,8 @@ const harness = await vi.hoisted(async () => {
     menu, popup, socketHeaders: vi.fn(), loginShell, readLoginShell, updateCheck, updateDownload, updateInstall,
     platformDispose,
     platformCloseAndWait,
+    get platformViewPlatform() { return platformViewPlatform },
+    recordPlatformViewPlatform(platform: 'darwin' | 'win32' | null) { platformViewPlatform = platform },
 
     get analyticsEnabled() { return analyticsEnabled },
     set analyticsEnabled(value: boolean) { analyticsEnabled = value; analyticsEnabledListener?.(value) },
@@ -261,6 +264,7 @@ const harness = await vi.hoisted(async () => {
       embeddedPolicy = undefined
       platformDisposeDeferred = undefined
       platformCloseDeferred = undefined
+      platformViewPlatform = undefined
     },
   }
 })
@@ -352,6 +356,9 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
 vi.mock('../src/platform-view.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/platform-view.ts')>(),
   DesktopPlatformView: class {
+    constructor(_preload: string, _locale: () => string, platform: 'darwin' | 'win32' | null) {
+      harness.recordPlatformViewPlatform(platform)
+    }
     notifyLocaleChanged() {}
     setSession() {}
     setBounds() {}
@@ -841,6 +848,17 @@ describe('desktop main startup', () => {
       expect(window.options).not.toHaveProperty('vibrancy')
     }
     expect(harness.hosts).toHaveLength(0)
+  })
+
+  it.each([
+    ['darwin', 'darwin'],
+    ['win32', 'win32'],
+    ['linux', null],
+  ] as const)('reports the %s host as the %s Platform client identity', async (platform, expected) => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    expect(harness.platformViewPlatform).toBe(expected)
   })
 
   it('serves packaged shell documents instead of rejecting the shell origin', async () => {
